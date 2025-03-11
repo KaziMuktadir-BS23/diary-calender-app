@@ -1,0 +1,33 @@
+.date__card {
+  cursor: pointer;
+}
+
+.date__card + .today .Polaris-Box {
+  background-color: lightcyan;
+}
+
+.date__card:hover {
+  cursor: pointer;
+  transform: scale(1.05);
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(200px, 1fr));
+  padding: 1rem;
+  gap: 10px;
+}
+
+.grid-item {
+  background-color: white;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+  border: 1px solid #ccc;
+  padding: 10px;
+  min-height: 90px;
+  border-radius: 20px;
+}
+
+.grid-container::after {
+  content: "";
+  grid-column: 1 / -1;
+}
