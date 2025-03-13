@@ -72,22 +72,21 @@ export const getByMYNoteAPI = async (fetcher, { month, year }) => {
   }
 };
 
-export const deleteNoteByIdAPI = async (fetcher, { id }) => {
-  try {
-    const response = await fetcher(`/api/note/${id}`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-    });
-    const resJson = await response.json();
+// export const deleteNoteByIdAPI = async (fetcher, { id }) => {
+//   try {
+//     const response = await fetcher(`/api/note/${id}`, {
+//       method: "DELETE",
+//       headers: { "Content-Type": "application/json" },
+//     });
+//     const resJson = await response.json();
 
-    console.log("response in deleteNoteByIdAPI", resJson);
-    return resJson;
-  } catch (err) {
-    console.log("Error in deleteNoteByIdAPI: ", err);
-    return err;
-  }
-};
-
+//     console.log("response in deleteNoteByIdAPI", resJson);
+//     return resJson;
+//   } catch (err) {
+//     console.log("Error in deleteNoteByIdAPI: ", err);
+//     return err;
+//   }
+// };
 export const updateNoteAPI = async (fetcher, { id, title, content, tag }) => {
   try {
     const response = await fetcher(`/api/note/${id}`, {
@@ -99,12 +98,48 @@ export const updateNoteAPI = async (fetcher, { id, title, content, tag }) => {
       }),
       headers: { "Content-Type": "application/json" },
     });
-    const resJson = await response.json();
 
-    console.log("response in updateNoteAPI", resJson);
+    const resJson = await response.json();
+    console.log("Response in updateNoteAPI:", resJson);
     return resJson;
   } catch (err) {
-    console.log("Error in updateNoteAPI: ", err);
-    return err;
+    console.log("Error in updateNoteAPI:", err);
+    return { message: "Failed", error: err.message };
+  }
+};
+
+// export const updateNoteAPI = async (fetcher, { id, title, content, tag }) => {
+//   try {
+//     const response = await fetcher(`/api/note/${id}`, {
+//       method: "PUT",
+//       body: JSON.stringify({
+//         title,
+//         content,
+//         tag,
+//       }),
+//       headers: { "Content-Type": "application/json" },
+//     });
+//     const resJson = await response.json();
+
+//     console.log("response in updateNoteAPI", resJson);
+//     return resJson;
+//   } catch (err) {
+//     console.log("Error in updateNoteAPI: ", err);
+//     return err;
+//   }
+// };
+export const deleteNoteByIdAPI = async (fetcher, { id }) => {
+  try {
+    const response = await fetcher(`/api/note/${id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const resJson = await response.json();
+    console.log("Response in deleteNoteByIdAPI:", resJson);
+    return resJson;
+  } catch (err) {
+    console.log("Error in deleteNoteByIdAPI:", err);
+    return { message: "Failed", error: err.message };
   }
 };

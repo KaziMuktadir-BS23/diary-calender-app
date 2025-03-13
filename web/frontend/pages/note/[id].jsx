@@ -25,12 +25,7 @@ const NoteListPage = () => {
 
   // FUNCTIONS
 
-  // const handleGetNotes = async () => {
-  //   setPageLoading(true);
-  //   const res = await getByDMYNoteAPI(fetcher, { date, month, year });
-  //   setNotes(res.data);
-  //   setPageLoading(false);
-  // };
+  
   const handleGetNotes = async () => {
     setPageLoading(true);
     const res = await getByDMYNoteAPI(fetcher, { date, month, year });

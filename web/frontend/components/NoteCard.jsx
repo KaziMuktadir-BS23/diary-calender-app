@@ -11,8 +11,7 @@ export const NoteCard = ({ note, handleGetNotes }) => {
   const fetcher = useAuthenticatedFetch();
 
   const [updateLoading, setUpdateLoading] = useState(false);
-  const [isUpdateNoteModalVisible, setIsUpdateNoteModalVisible] =
-    useState(false);
+  const [isUpdateNoteModalVisible, setIsUpdateNoteModalVisible] = useState(false);
 
   const handleUpdateModalOpenChange = useCallback(
     () => setIsUpdateNoteModalVisible(!isUpdateNoteModalVisible),
@@ -20,26 +19,55 @@ export const NoteCard = ({ note, handleGetNotes }) => {
   );
 
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [isDeleteNoteModalVisible, setIsDeleteNoteModalVisible] =
-    useState(false);
+  const [isDeleteNoteModalVisible, setIsDeleteNoteModalVisible] = useState(false);
 
   const handleDeleteModalOpenChange = useCallback(
     () => setIsDeleteNoteModalVisible(!isDeleteNoteModalVisible),
     [isDeleteNoteModalVisible]
   );
 
+  // const handleUpdateNote = async ({ id, title, content, tag }) => {
+  //   setUpdateLoading(true);
+  //   const response = await updateNoteAPI(fetcher, { id, title, content, tag });
+
+  //   if (response.message === "Success") {
+  //     await handleGetNotes();
+  //   }
+
+  //   setUpdateLoading(false);
+  //   handleUpdateModalOpenChange();
+  // };
+
+  // const handleDeleteNote = async () => {
+  //   setDeleteLoading(true);
+  //   const response = await deleteNoteByIdAPI(fetcher, { id: note.id });
+
+  //   if (response.message === "Success") {
+  //     await handleGetNotes();
+  //   }
+
+  //   setDeleteLoading(false);
+  // };
   const handleUpdateNote = async ({ id, title, content, tag }) => {
     setUpdateLoading(true);
-    await updateNoteAPI(fetcher, { id, title, content, tag });
-    await handleGetNotes();
-    handleUpdateModalOpenChange();
+    const response = await updateNoteAPI(fetcher, { id, title, content, tag });
+
+    if (response.message === "Success") {
+      await handleGetNotes(); // Refresh notes after update
+    }
+
     setUpdateLoading(false);
+    handleUpdateModalOpenChange();
   };
 
   const handleDeleteNote = async () => {
     setDeleteLoading(true);
-    await deleteNoteByIdAPI(fetcher, { id: note.id });
-    await handleGetNotes();
+    const response = await deleteNoteByIdAPI(fetcher, { id: note.id });
+
+    if (response.message === "Success") {
+      await handleGetNotes(); // Refresh notes after delete
+    }
+
     setDeleteLoading(false);
   };
 
