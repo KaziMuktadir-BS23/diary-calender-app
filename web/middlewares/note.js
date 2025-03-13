@@ -1,175 +1,220 @@
 import { NoteDB } from "../db.js";
 import shopify from "../shopify.js";
+import { randomUUID } from "crypto"; // Built-in Node.js module
 
 export const NoteAPI = (app) => {
-  // Create
-  app.post("/api/note", async (req, res) => {
+  const validateSession = (req, res, next) => {
+    const session = res.locals.shopify.session;
+    if (!session) {
+      return res.status(401).send({ message: "Unauthorized: Missing session" });
+    }
+    res.locals.client = new shopify.api.clients.Rest({ session });
+    next();
+  };
+
+  // Helper function to get shop ID
+  const getShopId = async (client) => {
+    const shopResponse = await client.get({ path: "/admin/api/2025-01/shop.json" });
+    return shopResponse?.body?.shop?.id;
+  };
+
+  // Helper function to get notes metafield
+  const getNotesMetafield = async (client) => {
+    const metafieldsResponse = await client.get({ path: `/admin/api/2025-01/metafields.json` });
+    return metafieldsResponse?.body?.metafields.find(
+      (metafield) => metafield.namespace === "BS_DiaryCalenderApp" && metafield.key === "BSDiaryCalenderAppNote"
+    );
+  };
+
+  // Helper function to parse notes from metafield
+  const parseNotes = (metafield) => {
+    if (!metafield) return [];
+
     try {
-      const client = new shopify.api.clients.Rest({
-        session: res.locals.shopify.session,
-      });
-      const response = await client.get({
-        path: `/admin/api/2023-07/shop.json`,
-      });
+      const parsedValue = JSON.parse(metafield.value);
+      return Array.isArray(parsedValue) ? parsedValue : [parsedValue];
+    } catch (parseError) {
+      console.error("Error parsing metafield value:", parseError);
+      return [];
+    }
+  };
 
-      const shopId = response?.body?.shop?.id;
+  // Helper function to save notes to metafield
+  const saveNotesToMetafield = async (client, notes, existingMetafieldId = null) => {
+    const metafieldData = {
+      metafield: {
+        namespace: "BS_DiaryCalenderApp",
+        key: "BSDiaryCalenderAppNote",
+        value: JSON.stringify(notes),
+        type: "json",
+      },
+    };
 
-      const result = await NoteDB.create({
-        shopId: shopId,
+    if (existingMetafieldId) {
+      metafieldData.metafield.id = existingMetafieldId;
+      return await client.put({
+        path: `/admin/api/2025-01/metafields/${existingMetafieldId}.json`,
+        data: metafieldData,
+      });
+    } else {
+      return await client.post({
+        path: `/admin/api/2025-01/metafields.json`,
+        data: metafieldData,
+      });
+    }
+  };
+
+  // Create Note
+  app.post("/api/note", validateSession, async (req, res) => {
+    try {
+      const { client } = res.locals;
+
+      const shopId = await getShopId(client);
+      if (!shopId) {
+        return res.status(400).send({ message: "Failed to retrieve shop ID" });
+      }
+
+      const existingMetafield = await getNotesMetafield(client);
+      const notes = parseNotes(existingMetafield);
+
+      const newNote = {
+        id: randomUUID(), // Generate unique ID
         title: req.body.title,
         content: req.body.content,
         tag: req.body.tag,
-        date: +req.body.date,
-        month: +req.body.month,
-        year: +req.body.year,
-      });
-      res.status(200).send({ message: "success", data: result });
+        date: req.body.date,
+        month: req.body.month,
+        year: req.body.year,
+      };
+
+      notes.push(newNote);
+
+      const metafieldResponse = await saveNotesToMetafield(client, notes, existingMetafield?.id);
+
+      res.status(200).send({ message: "Success", data: newNote });
     } catch (err) {
-      console.log({ err });
-      res.status(400).send({ message: "failed", error: err });
+      console.error("Error:", err);
+      res.status(400).send({ message: "Failed", error: err.message });
     }
   });
 
-  //Get
+  // Get all notes (using NoteDB)
   app.get("/api/note", async (req, res) => {
     try {
       const result = await NoteDB.list();
       res.status(200).send({ message: "success", data: result });
     } catch (err) {
-      // console.log({ err });
       res.status(200).send({ message: "failed", error: err });
     }
   });
 
-  app.get("/api/note/:date/:month/:year", async (req, res) => {
+  // Get notes by date
+  app.get("/api/note/:date/:month/:year", validateSession, async (req, res) => {
     try {
-      const client = new shopify.api.clients.Rest({
-        session: res.locals.shopify.session,
-      });
-      const response = await client.get({
-        path: `/admin/api/2023-07/shop.json`,
-      });
+      const { client } = res.locals;
 
-      const shopId = response?.body?.shop?.id;
+      const shopId = await getShopId(client);
+      if (!shopId) {
+        return res.status(400).send({ message: "Failed to retrieve shop ID" });
+      }
 
-      const result = await NoteDB.read({
-        shopId: shopId,
-        date: +req.params.date,
-        month: +req.params.month,
-        year: +req.params.year,
-      });
+      const notesMetafield = await getNotesMetafield(client);
+      const notes = parseNotes(notesMetafield);
 
-      res.status(200).send({ message: "success", data: result });
+      const filteredNotes = notes.filter(
+        (note) =>
+          +note.date === +req.params.date && +note.month === +req.params.month && +note.year === +req.params.year
+      );
+
+      res.status(200).send({ message: "Success", data: filteredNotes });
     } catch (err) {
-      console.log({ err });
-      res.status(200).send({ message: "failed", error: err });
+      console.error("Error:", err);
+      res.status(400).send({ message: "Failed", error: err.message });
     }
   });
 
-  app.get("/api/note/:month/:year", async (req, res) => {
+  // Get notes by month and year
+  app.get("/api/note/:month/:year", validateSession, async (req, res) => {
     try {
-      const client = new shopify.api.clients.Rest({
-        session: res.locals.shopify.session,
-      });
-      const response = await client.get({
-        path: `/admin/api/2023-07/shop.json`,
-      });
-      const shopId = response?.body?.shop?.id;
-      const result = await NoteDB.readByMonth({
-        shopId: shopId,
-        month: +req.params.month,
-        year: +req.params.year,
-      });
+      const { client } = res.locals;
 
-      res.status(200).send({ message: "success", data: result });
+      const shopId = await getShopId(client);
+      if (!shopId) {
+        return res.status(400).send({ message: "Failed to retrieve shop ID" });
+      }
+
+      const notesMetafield = await getNotesMetafield(client);
+      const notes = parseNotes(notesMetafield);
+
+      // Filter notes based on selected month and year
+      const filteredNotes = notes.filter(
+        (note) => +note.month === +req.params.month && +note.year === +req.params.year
+      );
+
+      res.status(200).send({ message: "Success", data: filteredNotes });
     } catch (err) {
-      console.log({ err });
-      res.status(200).send({ message: "failed", error: err });
+      console.error("Error:", err);
+      res.status(400).send({ message: "Failed", error: err.message });
     }
   });
 
-  // Put
-  app.put("/api/note/:id", async (req, res) => {
+  // Update note
+  app.put("/api/note/:id", validateSession, async (req, res) => {
     try {
-      await NoteDB.update({
-        id: req.params.id,
+      const { client } = res.locals;
+
+      const notesMetafield = await getNotesMetafield(client);
+      if (!notesMetafield) {
+        return res.status(400).send({ message: "Failed", error: "Metafield not found" });
+      }
+
+      let notes = parseNotes(notesMetafield);
+
+      // Find the note and update it
+      const noteIndex = notes.findIndex((note) => note.id === req.params.id);
+      if (noteIndex === -1) {
+        return res.status(404).send({ message: "Failed", error: "Note not found" });
+      }
+
+      notes[noteIndex] = {
+        ...notes[noteIndex],
         title: req.body.title,
         content: req.body.content,
         tag: req.body.tag,
-      });
+      };
 
-      res.status(200).send({ message: "success", data: req.params.id });
+      // Save updated notes back to metafield
+      await saveNotesToMetafield(client, notes, notesMetafield.id);
+
+      res.status(200).send({ message: "Success", data: notes[noteIndex] });
     } catch (err) {
-      console.log({ err });
-      res.status(200).send({ message: "failed", error: err });
+      console.error("Error updating note:", err);
+      res.status(400).send({ message: "Failed", error: err.message });
     }
   });
 
-  // Delete
-  app.delete("/api/note/:id", async (req, res) => {
+  // Delete note
+  app.delete("/api/note/:id", validateSession, async (req, res) => {
     try {
-      await NoteDB.delete({ id: req.params.id });
+      const { client } = res.locals;
 
-      res.status(200).send({ message: "success", data: req.params.id });
+      const notesMetafield = await getNotesMetafield(client);
+      if (!notesMetafield) {
+        return res.status(400).send({ message: "Failed", error: "Metafield not found" });
+      }
+
+      let notes = parseNotes(notesMetafield);
+
+      // Remove the note with the given id
+      notes = notes.filter((note) => note.id !== req.params.id);
+
+      // Save updated notes back to metafield
+      await saveNotesToMetafield(client, notes, notesMetafield.id);
+
+      res.status(200).send({ message: "Success", data: req.params.id });
     } catch (err) {
-      console.log({ err });
-      res.status(200).send({ message: "failed", error: err });
+      console.error("Error deleting note:", err);
+      res.status(400).send({ message: "Failed", error: err.message });
     }
   });
 };
-
-// Get ALL
-// app.get("/api/mystery-box", async (req, res) => {
-//   try {
-//     const result = await MysteryBoxDB.list();
-
-//     const queryParam =
-//       result &&
-//       result.length > 0 &&
-//       result?.map((res) => res.product_id).join(",");
-
-//     const client = new shopify.api.clients.Rest({
-//       session: res.locals.shopify.session,
-//     });
-
-//     const response = await client.get({
-//       path: `/products.json?ids=${queryParam}`,
-//     });
-
-//     res
-//       .status(200)
-//       .send({ message: "Success", data: response?.body?.products });
-//   } catch (err) {
-//     // console.log({ err });
-//     res.status(200).send({ message: "failed", data: [] });
-//   }
-// });
-
-// // Get Single Product
-// app.get("/api/mystery-box/:id", async (req, res) => {
-//   try {
-//     const result = await MysteryBoxDB.read(req.params.id);
-
-//     const client = new shopify.api.clients.Rest({
-//       session: res.locals.shopify.session,
-//     });
-
-//     const response = await client.get({
-//       path: `/products/${result.product_id}.json`,
-//     });
-
-//     const responseCollection = await client.get({
-//       path: `/admin/api/2023-04/collections/${result.collection_id}.json`,
-//     });
-
-//     res.status(200).send({
-//       message: "Success",
-//       data: {
-//         ...response?.body?.product,
-//         mystery_collection: responseCollection?.body?.collection,
-//       },
-//     });
-//   } catch (err) {
-//     // console.log({ err });
-//   }
-// });

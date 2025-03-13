@@ -47,19 +47,23 @@ export default function HomePage() {
   const [selectedMonth, setSelectedMonth] = useState(dayjs().month());
   const [selectedYear, setSelectedYear] = useState(dayjs().year());
 
-  const handleMonthChange = useCallback(
-    (value) => setSelectedMonth(+value),
-    []
-  );
+  const handleMonthChange = useCallback((value) => setSelectedMonth(+value), []);
   const handleYearChange = useCallback((value) => setSelectedYear(+value), []);
 
+ 
   const handleGetNotes = async () => {
     setPageLoading(true);
     const res = await getByMYNoteAPI(fetcher, {
       month: selectedMonth,
       year: selectedYear,
     });
-    setNotes(res.data);
+
+    if (res.message === "Success" && Array.isArray(res.data)) {
+      setNotes(res.data);
+    } else {
+      setNotes([]); // Default to empty array if data is invalid
+    }
+
     setPageLoading(false);
   };
 
@@ -90,10 +94,7 @@ export default function HomePage() {
         />
         <Select
           label="Year"
-          options={Array.from(
-            { length: 5 },
-            (_, i) => dayjs().year() - 2 + i
-          ).map((year) => ({
+          options={Array.from({ length: 5 }, (_, i) => dayjs().year() - 2 + i).map((year) => ({
             label: year,
             value: year,
           }))}
@@ -118,32 +119,21 @@ export default function HomePage() {
             </p>
           ))}
 
-          {[
-            ...Array(firstWeekDayInMonth(selectedYear, selectedMonth)).keys(),
-          ].map((emp, index) => (
-            <div
-              className="grid-item"
-              key={index}
-              style={{ backgroundColor: "lightgray" }}
-            >
+          {[...Array(firstWeekDayInMonth(selectedYear, selectedMonth)).keys()].map((emp, index) => (
+            <div className="grid-item" key={index} style={{ backgroundColor: "lightgray" }}>
               {"-"}
             </div>
           ))}
-          {Array.from(
-            { length: daysInMonth(selectedYear, selectedMonth) },
-            (_, i) => i + 1
-          ).map((date, index) => (
+         
+          {Array.from({ length: daysInMonth(selectedYear, selectedMonth) }, (_, i) => i + 1).map((date, index) => (
             <DateCard
+              key={date} // Added key for better React performance
               date={date}
               month={selectedMonth}
               year={selectedYear}
-              notes={notes?.filter((note) => note.date === date)}
+              notes={notes?.filter((note) => +note.date === date)}
               index={index}
-              today={
-                dayjs().year() === selectedYear &&
-                dayjs().month() === selectedMonth &&
-                dayjs().date() === date
-              }
+              today={dayjs().year() === selectedYear && dayjs().month() === selectedMonth && dayjs().date() === date}
             />
           ))}
         </div>
