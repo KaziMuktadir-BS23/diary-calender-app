@@ -8,7 +8,6 @@ import shopify from "./shopify.js";
 import productCreator from "./product-creator.js";
 import GDPRWebhookHandlers from "./gdpr.js";
 import { NoteAPI } from "./middlewares/note.js";
-// import { MetaFieldAPI } from "./middlewares/metafield.js";
 
 const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT || "3000", 10);
 
@@ -30,7 +29,7 @@ app.use("/api/*", shopify.validateAuthenticatedSession());
 app.use(express.json());
 
 NoteAPI(app);
-// MetaFieldAPI(app);
+
 app.use(shopify.cspHeaders());
 app.use(serveStatic(STATIC_PATH, { index: false }));
 
