@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  Page,
-  ResourceList,
-  ResourceItem,
-  LegacyCard,
-  EmptyState,
-} from "@shopify/polaris";
+import { Page, ResourceList, ResourceItem, LegacyCard, EmptyState } from "@shopify/polaris";
 
 import { useAuthenticatedFetch } from "../../hooks";
 import { createNoteAPI, getByDMYNoteAPI } from "../../rest";
@@ -22,8 +16,7 @@ const NoteListPage = () => {
   const [createLoading, setCreateLoading] = useState(false);
 
   const [notes, setNotes] = useState([]);
-  const [isCreateNoteModalVisible, setIsCreateNoteModalVisible] =
-    useState(false);
+  const [isCreateNoteModalVisible, setIsCreateNoteModalVisible] = useState(false);
 
   const handleModalOpenChange = useCallback(
     () => setIsCreateNoteModalVisible(!isCreateNoteModalVisible),
@@ -32,19 +25,38 @@ const NoteListPage = () => {
 
   // FUNCTIONS
 
+  // const handleGetNotes = async () => {
+  //   setPageLoading(true);
+  //   const res = await getByDMYNoteAPI(fetcher, { date, month, year });
+  //   setNotes(res.data);
+  //   setPageLoading(false);
+  // };
   const handleGetNotes = async () => {
     setPageLoading(true);
     const res = await getByDMYNoteAPI(fetcher, { date, month, year });
-    setNotes(res.data);
+
+    if (res.message === "Success") {
+      setNotes(res.data || []);
+    } else {
+      setNotes([]);
+    }
+
     setPageLoading(false);
   };
 
   const handleCreateNote = async ({ title, content, tag }) => {
     setCreateLoading(true);
-    await createNoteAPI(fetcher, { title, content, tag, date, month, year });
-    await handleGetNotes();
-    handleModalOpenChange();
+
+    const response = await createNoteAPI(fetcher, { title, content, tag, date, month, year });
+
+    console.log("Metafield Response:", response);
+
+    if (response.message === "Success") {
+      await handleGetNotes();
+    }
+
     setCreateLoading(false);
+    handleModalOpenChange();
   };
 
   useEffect(() => {
@@ -71,11 +83,22 @@ const NoteListPage = () => {
             items={notes.reverse()}
             renderItem={(note) => (
               <ResourceItem
-                id={note.id}
-                accessibilityLabel={`View details for ${note.title}`}
+                id={note.id || Date.now()} // Use Date.now() if no ID exists
+                accessibilityLabel={`View details for ${note.title || "Untitled"}`}
                 persistActions
               >
-                <NoteCard note={note} handleGetNotes={handleGetNotes} />
+                <NoteCard
+                  note={{
+                    id: note.id || Date.now(),
+                    title: note.title || "Untitled",
+                    content: note.content || "",
+                    tag: note.tag || "",
+                    date: note.date || "",
+                    month: note.month || "",
+                    year: note.year || "",
+                  }}
+                  handleGetNotes={handleGetNotes}
+                />
               </ResourceItem>
             )}
           />
@@ -93,10 +116,8 @@ const NoteListPage = () => {
               fullWidth
             >
               <p>
-                Notes enhance memory, organization, understanding, exam prep,
-                recall, creativity, collaboration, and personal growth—saving
-                time, fostering comprehension, and enabling efficient knowledge
-                sharing.
+                Notes enhance memory, organization, understanding, exam prep, recall, creativity, collaboration, and
+                personal growth—saving time, fostering comprehension, and enabling efficient knowledge sharing.
               </p>
             </EmptyState>
           </LegacyCard>

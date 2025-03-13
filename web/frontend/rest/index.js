@@ -1,7 +1,4 @@
-export const createNoteAPI = async (
-  fetcher,
-  { title, content, tag, date, month, year }
-) => {
+export const createNoteAPI = async (fetcher, { title, content, tag, date, month, year }) => {
   try {
     const response = await fetcher("/api/note", {
       method: "POST",
@@ -48,13 +45,14 @@ export const getByDMYNoteAPI = async (fetcher, { date, month, year }) => {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     });
-    const resJson = await response.json();
 
-    console.log("response in getByDMYNoteAPI", resJson);
+    const resJson = await response.json();
+    console.log("Response in getByDMYNoteAPI:", resJson);
+
     return resJson;
   } catch (err) {
-    console.log("Error in getByDMYNoteAPI: ", err);
-    return err;
+    console.log("Error in getByDMYNoteAPI:", err);
+    return { message: "Failed", error: err.message };
   }
 };
 
@@ -66,11 +64,11 @@ export const getByMYNoteAPI = async (fetcher, { month, year }) => {
     });
     const resJson = await response.json();
 
-    console.log("response in getByMYNoteAPI", resJson);
+    console.log("Response in getByMYNoteAPI:", resJson);
     return resJson;
   } catch (err) {
-    console.log("Error in getByMYNoteAPI: ", err);
-    return err;
+    console.log("Error in getByMYNoteAPI:", err);
+    return { message: "Failed", error: err.message };
   }
 };
 
