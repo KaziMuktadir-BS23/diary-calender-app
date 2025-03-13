@@ -3,40 +3,79 @@ import shopify from "../shopify.js";
 import { randomUUID } from "crypto"; // Built-in Node.js module
 
 export const NoteAPI = (app) => {
-  // Create
+  const validateSession = (req, res, next) => {
+    const session = res.locals.shopify.session;
+    if (!session) {
+      return res.status(401).send({ message: "Unauthorized: Missing session" });
+    }
+    res.locals.client = new shopify.api.clients.Rest({ session });
+    next();
+  };
 
-  app.post("/api/note", async (req, res) => {
+  // Helper function to get shop ID
+  const getShopId = async (client) => {
+    const shopResponse = await client.get({ path: "/admin/api/2025-01/shop.json" });
+    return shopResponse?.body?.shop?.id;
+  };
+
+  // Helper function to get notes metafield
+  const getNotesMetafield = async (client) => {
+    const metafieldsResponse = await client.get({ path: `/admin/api/2025-01/metafields.json` });
+    return metafieldsResponse?.body?.metafields.find(
+      (metafield) => metafield.namespace === "BS_DiaryCalenderApp" && metafield.key === "BSDiaryCalenderAppNote"
+    );
+  };
+
+  // Helper function to parse notes from metafield
+  const parseNotes = (metafield) => {
+    if (!metafield) return [];
+
     try {
-      const session = res.locals.shopify.session;
-      if (!session) {
-        return res.status(401).send({ message: "Unauthorized: Missing session" });
-      }
-      const client = new shopify.api.clients.Rest({ session });
+      const parsedValue = JSON.parse(metafield.value);
+      return Array.isArray(parsedValue) ? parsedValue : [parsedValue];
+    } catch (parseError) {
+      console.error("Error parsing metafield value:", parseError);
+      return [];
+    }
+  };
 
-      const shopResponse = await client.get({ path: "/admin/api/2025-01/shop.json" });
-      const shopId = shopResponse?.body?.shop?.id;
+  // Helper function to save notes to metafield
+  const saveNotesToMetafield = async (client, notes, existingMetafieldId = null) => {
+    const metafieldData = {
+      metafield: {
+        namespace: "BS_DiaryCalenderApp",
+        key: "BSDiaryCalenderAppNote",
+        value: JSON.stringify(notes),
+        type: "json",
+      },
+    };
+
+    if (existingMetafieldId) {
+      metafieldData.metafield.id = existingMetafieldId;
+      return await client.put({
+        path: `/admin/api/2025-01/metafields/${existingMetafieldId}.json`,
+        data: metafieldData,
+      });
+    } else {
+      return await client.post({
+        path: `/admin/api/2025-01/metafields.json`,
+        data: metafieldData,
+      });
+    }
+  };
+
+  // Create Note
+  app.post("/api/note", validateSession, async (req, res) => {
+    try {
+      const { client } = res.locals;
+
+      const shopId = await getShopId(client);
       if (!shopId) {
         return res.status(400).send({ message: "Failed to retrieve shop ID" });
       }
 
-      // Fetch existing metafield
-      const metafieldsResponse = await client.get({ path: `/admin/api/2025-01/metafields.json` });
-      const existingMetafield = metafieldsResponse?.body?.metafields.find(
-        (metafield) => metafield.namespace === "BS_DiaryCalenderApp" && metafield.key === "BSDiaryCalenderAppNote"
-      );
-
-      let notes = [];
-      if (existingMetafield) {
-        try {
-          const parsedValue = JSON.parse(existingMetafield.value);
-          notes = Array.isArray(parsedValue) ? parsedValue : [parsedValue];
-        } catch (parseError) {
-          console.error("Error parsing existing metafield:", parseError);
-          notes = [];
-        }
-      }
-
-      console.log("Existing Notes:", notes);
+      const existingMetafield = await getNotesMetafield(client);
+      const notes = parseNotes(existingMetafield);
 
       const newNote = {
         id: randomUUID(), // Generate unique ID
@@ -50,20 +89,8 @@ export const NoteAPI = (app) => {
 
       notes.push(newNote);
 
-      // Save updated notes to the metafield
-      const metafieldResponse = await client.post({
-        path: `/admin/api/2025-01/metafields.json`,
-        data: {
-          metafield: {
-            namespace: "BS_DiaryCalenderApp",
-            key: "BSDiaryCalenderAppNote",
-            value: JSON.stringify(notes),
-            type: "json",
-          },
-        },
-      });
+      const metafieldResponse = await saveNotesToMetafield(client, notes, existingMetafield?.id);
 
-      console.log("Updated Metafield Response:", metafieldResponse.body);
       res.status(200).send({ message: "Success", data: newNote });
     } catch (err) {
       console.error("Error:", err);
@@ -71,7 +98,7 @@ export const NoteAPI = (app) => {
     }
   });
 
-  //Get
+  // Get all notes (using NoteDB)
   app.get("/api/note", async (req, res) => {
     try {
       const result = await NoteDB.list();
@@ -81,54 +108,23 @@ export const NoteAPI = (app) => {
     }
   });
 
-  app.get("/api/note/:date/:month/:year", async (req, res) => {
+  // Get notes by date
+  app.get("/api/note/:date/:month/:year", validateSession, async (req, res) => {
     try {
-      const session = res.locals.shopify.session;
+      const { client } = res.locals;
 
-      if (!session) {
-        return res.status(401).send({ message: "Unauthorized: Missing session" });
-      }
-
-      const client = new shopify.api.clients.Rest({ session });
-
-      const shopResponse = await client.get({
-        path: "/admin/api/2023-07/shop.json",
-      });
-      const shopId = shopResponse?.body?.shop?.id;
+      const shopId = await getShopId(client);
       if (!shopId) {
         return res.status(400).send({ message: "Failed to retrieve shop ID" });
       }
 
-      const metafieldsResponse = await client.get({
-        path: `/admin/api/2025-01/metafields.json`,
-      });
-      console.log("Metafields Response:", metafieldsResponse.body);
-
-      const notesMetafield = metafieldsResponse?.body?.metafields.find(
-        (metafield) => metafield.namespace === "BS_DiaryCalenderApp" && metafield.key === "BSDiaryCalenderAppNote"
-      );
-      console.log("Notes Metafield:", notesMetafield);
-      if (!notesMetafield) {
-        return res.status(200).send({ message: "Success", data: [] }); // No notes found
-      }
-
-      let notes;
-      try {
-        notes = JSON.parse(notesMetafield.value);
-        if (!Array.isArray(notes)) {
-          notes = [];
-        }
-      } catch (parseError) {
-        console.error("Error parsing metafield value:", parseError);
-        notes = [];
-      }
-      console.log("Notes:", notes);
+      const notesMetafield = await getNotesMetafield(client);
+      const notes = parseNotes(notesMetafield);
 
       const filteredNotes = notes.filter(
         (note) =>
           +note.date === +req.params.date && +note.month === +req.params.month && +note.year === +req.params.year
       );
-      console.log("Filtered Notes:", filteredNotes);
 
       res.status(200).send({ message: "Success", data: filteredNotes });
     } catch (err) {
@@ -137,80 +133,42 @@ export const NoteAPI = (app) => {
     }
   });
 
-  // Put
-  app.get("/api/note/:month/:year", async (req, res) => {
+  // Get notes by month and year
+  app.get("/api/note/:month/:year", validateSession, async (req, res) => {
     try {
-      const session = res.locals.shopify.session;
-      if (!session) {
-        return res.status(401).send({ message: "Unauthorized: Missing session" });
-      }
+      const { client } = res.locals;
 
-      const client = new shopify.api.clients.Rest({ session });
-
-      const shopResponse = await client.get({
-        path: "/admin/api/2023-07/shop.json",
-      });
-      const shopId = shopResponse?.body?.shop?.id;
+      const shopId = await getShopId(client);
       if (!shopId) {
         return res.status(400).send({ message: "Failed to retrieve shop ID" });
       }
 
-      const metafieldsResponse = await client.get({
-        path: `/admin/api/2025-01/metafields.json`,
-      });
-
-      const notesMetafield = metafieldsResponse?.body?.metafields.find(
-        (metafield) => metafield.namespace === "BS_DiaryCalenderApp" && metafield.key === "BSDiaryCalenderAppNote"
-      );
-
-      if (!notesMetafield) {
-        return res.status(200).send({ message: "Success", data: [] }); // No notes found
-      }
-
-      let notes;
-      try {
-        notes = JSON.parse(notesMetafield.value);
-        if (!Array.isArray(notes)) {
-          notes = [notes]; // Convert object to array if necessary
-        }
-      } catch (parseError) {
-        console.error("Error parsing metafield value:", parseError);
-        notes = [];
-      }
+      const notesMetafield = await getNotesMetafield(client);
+      const notes = parseNotes(notesMetafield);
 
       // Filter notes based on selected month and year
       const filteredNotes = notes.filter(
         (note) => +note.month === +req.params.month && +note.year === +req.params.year
       );
 
-      console.log("Filtered Notes:", filteredNotes);
       res.status(200).send({ message: "Success", data: filteredNotes });
     } catch (err) {
       console.error("Error:", err);
       res.status(400).send({ message: "Failed", error: err.message });
     }
   });
-  // update
-  app.put("/api/note/:id", async (req, res) => {
+
+  // Update note
+  app.put("/api/note/:id", validateSession, async (req, res) => {
     try {
-      const session = res.locals.shopify.session;
-      if (!session) {
-        return res.status(401).send({ message: "Unauthorized: Missing session" });
-      }
+      const { client } = res.locals;
 
-      const client = new shopify.api.clients.Rest({ session });
-
-      // Fetch existing metafield
-      const metafieldsResponse = await client.get({ path: `/admin/api/2025-01/metafields.json` });
-      const notesMetafield = metafieldsResponse?.body?.metafields.find(
-        (metafield) => metafield.namespace === "BS_DiaryCalenderApp" && metafield.key === "BSDiaryCalenderAppNote"
-      );
-
+      const notesMetafield = await getNotesMetafield(client);
       if (!notesMetafield) {
         return res.status(400).send({ message: "Failed", error: "Metafield not found" });
       }
 
-      let notes = JSON.parse(notesMetafield.value) || [];
+      let notes = parseNotes(notesMetafield);
 
       // Find the note and update it
       const noteIndex = notes.findIndex((note) => note.id === req.params.id);
@@ -226,18 +184,7 @@ export const NoteAPI = (app) => {
       };
 
       // Save updated notes back to metafield
-      const updateResponse = await client.put({
-        path: `/admin/api/2025-01/metafields/${notesMetafield.id}.json`,
-        data: {
-          metafield: {
-            id: notesMetafield.id,
-            namespace: "BS_DiaryCalenderApp",
-            key: "BSDiaryCalenderAppNote",
-            value: JSON.stringify(notes), // Save updated list
-            type: "json",
-          },
-        },
-      });
+      await saveNotesToMetafield(client, notes, notesMetafield.id);
 
       res.status(200).send({ message: "Success", data: notes[noteIndex] });
     } catch (err) {
@@ -246,44 +193,23 @@ export const NoteAPI = (app) => {
     }
   });
 
-  // Delete
-  app.delete("/api/note/:id", async (req, res) => {
+  // Delete note
+  app.delete("/api/note/:id", validateSession, async (req, res) => {
     try {
-      const session = res.locals.shopify.session;
-      if (!session) {
-        return res.status(401).send({ message: "Unauthorized: Missing session" });
-      }
+      const { client } = res.locals;
 
-      const client = new shopify.api.clients.Rest({ session });
-
-      // Fetch existing metafield
-      const metafieldsResponse = await client.get({ path: `/admin/api/2025-01/metafields.json` });
-      const notesMetafield = metafieldsResponse?.body?.metafields.find(
-        (metafield) => metafield.namespace === "BS_DiaryCalenderApp" && metafield.key === "BSDiaryCalenderAppNote"
-      );
-
+      const notesMetafield = await getNotesMetafield(client);
       if (!notesMetafield) {
         return res.status(400).send({ message: "Failed", error: "Metafield not found" });
       }
 
-      let notes = JSON.parse(notesMetafield.value) || [];
+      let notes = parseNotes(notesMetafield);
 
       // Remove the note with the given id
       notes = notes.filter((note) => note.id !== req.params.id);
 
       // Save updated notes back to metafield
-      const updateResponse = await client.put({
-        path: `/admin/api/2025-01/metafields/${notesMetafield.id}.json`,
-        data: {
-          metafield: {
-            id: notesMetafield.id,
-            namespace: "BS_DiaryCalenderApp",
-            key: "BSDiaryCalenderAppNote",
-            value: JSON.stringify(notes), // Save updated list
-            type: "json",
-          },
-        },
-      });
+      await saveNotesToMetafield(client, notes, notesMetafield.id);
 
       res.status(200).send({ message: "Success", data: req.params.id });
     } catch (err) {

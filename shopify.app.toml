@@ -3,7 +3,7 @@
 client_id = "ec23bbd3ec5198aedf18fa5f40036f83"
 name = "app-test-joy"
 handle = "app-test-joy"
-application_url = "https://element-heath-member-rep.trycloudflare.com"
+application_url = "https://dramatic-fossil-width-acm.trycloudflare.com"
 embedded = true
 
 [build]
@@ -16,9 +16,9 @@ scopes = "read_all_orders,read_customers,read_orders,read_products,write_custome
 
 [auth]
 redirect_urls = [
-  "https://element-heath-member-rep.trycloudflare.com/auth/callback",
-  "https://element-heath-member-rep.trycloudflare.com/auth/shopify/callback",
-  "https://element-heath-member-rep.trycloudflare.com/api/auth/callback"
+  "https://dramatic-fossil-width-acm.trycloudflare.com/auth/callback",
+  "https://dramatic-fossil-width-acm.trycloudflare.com/auth/shopify/callback",
+  "https://dramatic-fossil-width-acm.trycloudflare.com/api/auth/callback"
 ]
 
 [webhooks]

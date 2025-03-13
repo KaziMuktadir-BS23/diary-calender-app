@@ -14,10 +14,8 @@ export const createNoteAPI = async (fetcher, { title, content, tag, date, month,
     });
     const resJson = await response.json();
 
-    console.log("response in createNoteAPI", resJson);
     return resJson;
   } catch (err) {
-    console.log("Error in createNoteAPI: ", err);
     return err;
   }
 };
@@ -31,10 +29,8 @@ export const getAllNoteAPI = async (fetcher) => {
     });
     const resJson = await response.json();
 
-    console.log("response in getAllNoteAPI", resJson);
     return resJson;
   } catch (err) {
-    console.log("Error in getAllNoteAPI: ", err);
     return err;
   }
 };
@@ -47,11 +43,9 @@ export const getByDMYNoteAPI = async (fetcher, { date, month, year }) => {
     });
 
     const resJson = await response.json();
-    console.log("Response in getByDMYNoteAPI:", resJson);
 
     return resJson;
   } catch (err) {
-    console.log("Error in getByDMYNoteAPI:", err);
     return { message: "Failed", error: err.message };
   }
 };
@@ -64,10 +58,8 @@ export const getByMYNoteAPI = async (fetcher, { month, year }) => {
     });
     const resJson = await response.json();
 
-    console.log("Response in getByMYNoteAPI:", resJson);
     return resJson;
   } catch (err) {
-    console.log("Error in getByMYNoteAPI:", err);
     return { message: "Failed", error: err.message };
   }
 };
@@ -100,10 +92,9 @@ export const updateNoteAPI = async (fetcher, { id, title, content, tag }) => {
     });
 
     const resJson = await response.json();
-    console.log("Response in updateNoteAPI:", resJson);
     return resJson;
   } catch (err) {
-    console.log("Error in updateNoteAPI:", err);
+    // console.log("Error  updateNoteAPI:", err);
     return { message: "Failed", error: err.message };
   }
 };

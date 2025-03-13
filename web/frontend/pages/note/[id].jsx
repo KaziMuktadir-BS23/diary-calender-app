@@ -25,7 +25,6 @@ const NoteListPage = () => {
 
   // FUNCTIONS
 
-  
   const handleGetNotes = async () => {
     setPageLoading(true);
     const res = await getByDMYNoteAPI(fetcher, { date, month, year });
@@ -43,8 +42,6 @@ const NoteListPage = () => {
     setCreateLoading(true);
 
     const response = await createNoteAPI(fetcher, { title, content, tag, date, month, year });
-
-    console.log("Metafield Response:", response);
 
     if (response.message === "Success") {
       await handleGetNotes();
